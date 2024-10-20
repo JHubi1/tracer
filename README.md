@@ -138,16 +138,16 @@ To add error / exception and stack trace reporting, you can add the attributes `
 
 ```dart
 try {
-    throw Exception("This is a stack trace");
+    throw Exception("This is an error");
 } catch (e, s) {
-    t.fatal("This is an error",
+    t.fatal("This is a stack trace",
         error: e, stack: s);
 }
 ```
 
 ```log
 [2024-10-20 17:59:21 +0200] Fatal: example: This is a stack trace
-                            |- Exception: This is an exception
+                            |- Exception: This is an error
                             |- example\tracer_example.dart 31:5  main
 ```
 
