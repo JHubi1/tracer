@@ -1,4 +1,4 @@
-/// A modern and easy to implement logging framework for Dart.
+/// A modern, simple and easy-to-implement logging framework for Dart.
 library;
 
 export 'src/tracer_base.dart';

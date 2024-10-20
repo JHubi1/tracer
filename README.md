@@ -1,9 +1,8 @@
 # Tracer
 
-A modern and easy to implement logging framework for Dart.
+A modern, simple and easy-to-implement logging framework for Dart.
 
 ![example usage](https://github.com/JHubi1/tracer/raw/main/assets/img1.png)
-
 
 > The package should be working with all Flutter platforms, including web. It has also been tested with pure Dart.
 

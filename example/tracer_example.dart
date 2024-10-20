@@ -42,16 +42,4 @@ void main() {
         error: error,
         stack: stack);
   });
-
-  print("-----\n\n\n");
-  try {
-    throw Exception("You haven't tried Tracer yet!?");
-  } catch (e, s) {
-    t.fatal("You really should try Tracer",
-        description:
-            "Tracer is a modern and easy to implement logging framework for Dart.",
-        error: e,
-        stack: s);
-  }
-  print("\n\n\n");
 }

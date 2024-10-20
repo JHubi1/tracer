@@ -229,7 +229,7 @@ class Tracer {
   TracerLevel logLevel;
 
   /// Whether to use indentation in the output.
-  /// 
+  ///
   /// This is only used in the [TracerEventData]s generated message. It can be
   /// useful if the console is quite narrow, so every bit of space is important.
   bool indentation;
