@@ -253,7 +253,7 @@ class Tracer {
       : section = section.trim(),
         _filters = filters {
     assert(this.section.isNotEmpty);
-    assert(RegExp(r'[a-zA-Z0-9_]+').hasMatch(this.section));
+    assert(RegExp(r'[a-zA-Z_][a-zA-Z0-9_]*').hasMatch(this.section));
 
     listen((data) {
       _logs.add(data);
