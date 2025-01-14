@@ -1,6 +1,7 @@
 import 'dart:core';
+import 'dart:async';
+
 import 'package:intl/intl.dart';
-import 'package:event/event.dart';
 import 'package:stack_trace/stack_trace.dart';
 
 String _helperTextCenter(String text) {
@@ -50,8 +51,8 @@ enum TracerLevel {
       {this.useStderr = false});
 }
 
-/// The payload for a new log message event. Should not be created manually.
-class TracerEventData extends EventArgs {
+/// The payload for a new log message event.
+class TracerEventData {
   /// The name of the section this event was created in.
   final String section;
 
@@ -80,11 +81,15 @@ class TracerEventData extends EventArgs {
   /// quite narrow, so every bit of space is important.
   bool indentation;
 
-  TracerEventData(this.section, this.level, this.timestamp, this.body,
-      {required this.description,
+  TracerEventData._(
+      {required this.section,
+      required this.level,
+      required this.timestamp,
+      required this.body,
+      required this.description,
       required this.error,
       required this.stack,
-      this.indentation = true});
+      required this.indentation});
 
   /// Creates a rich output including a [timestamp], the severity [level], and
   /// the [body]. If given, it also embeds the [description], [error] and
@@ -153,10 +158,18 @@ class TracerEventData extends EventArgs {
 /// ]);
 /// ```
 abstract class TracerHandler {
-  TracerHandler();
-
   /// The function handling the event.
   void handle(TracerEventData data);
+
+  StreamSubscription? subscription;
+
+  @override
+  bool operator ==(Object other) {
+    return other is TracerHandler && other.handle == handle;
+  }
+
+  @override
+  int get hashCode => handle.hashCode;
 }
 
 /// Blueprint for filters.
@@ -188,8 +201,16 @@ abstract class TracerHandler {
 /// ]);
 /// ```
 abstract class TracerFilter {
-  TracerFilter();
+  /// The function handling the event.
   bool handle(TracerEventData data);
+
+  @override
+  bool operator ==(Object other) {
+    return other is TracerFilter && other.handle == handle;
+  }
+
+  @override
+  int get hashCode => handle.hashCode;
 }
 
 /// The main object for the Tracer library.
@@ -221,6 +242,10 @@ abstract class TracerFilter {
 /// You can select which errors are shown using the [logLevel] argument. The
 /// set value is the smallest one allowed. Only events using it and any above
 /// will get handled.
+///
+/// Warning: Logs may be slightly delayed. It may take one millisecond delay
+/// to detect a log event from a synchronous function. This may be relevant
+/// for testing purposes.
 class Tracer {
   /// Unique identifier for this [Tracer] instance.
   final String section;
@@ -243,7 +268,13 @@ class Tracer {
   String get logsGenerated => _logsGenerated;
   String _logsGenerated = "";
 
+  final List<TracerHandler> _handlers;
+  List<TracerHandler> get handlers => _handlers;
+
   final List<TracerFilter> _filters;
+  List<TracerFilter> get filters => _filters;
+
+  final _stream = StreamController<TracerEventData>.broadcast();
 
   Tracer(String section,
       {this.logLevel = TracerLevel.info,
@@ -251,35 +282,79 @@ class Tracer {
       List<TracerFilter> filters = const [],
       this.indentation = true})
       : section = section.trim(),
+        _handlers = [],
         _filters = filters {
     assert(this.section.isNotEmpty);
     assert(RegExp(r'[a-zA-Z_][a-zA-Z0-9_]*').hasMatch(this.section));
 
-    listen((data) {
+    _stream.stream.listen((data) {
       _logs.add(data);
       _logsGenerated += "${data.generatedMessage}\n";
     });
 
-    for (var handler in handlers) {
-      listen(handler.handle);
+    for (var i = 0; i < handlers.length; i++) {
+      _add(handlers[i], argument: "handlers[$i]");
     }
   }
 
-  final _onLog = Event<TracerEventData>();
-
-  /// Subscribe to the log event. This may no longer be used in favor of
-  /// [TracerHandler].
-  void listen(void Function(TracerEventData data) handler) {
-    _onLog.subscribe(handler);
+  /// Cancels a handler.
+  ///
+  /// This will cancel the subscription of the handler, effectively stopping it
+  /// from receiving any more events. If the handler is not found, nothing will
+  /// happen.
+  ///
+  /// Alternatively, you can use the [cancelAt] function to cancel a handler by
+  /// index. This is useful if you want to cancel a handler order they were added.
+  void cancel(TracerHandler handler) {
+    for (var i = 0; i < _handlers.length; i++) {
+      if (_handlers[i] == handler) {
+        _handlers[i].subscription?.cancel();
+        _handlers.removeAt(i);
+        return;
+      }
+    }
   }
 
-  /// Unsubscribe from the log event. This may no longer be used in favor of
-  /// [TracerHandler].
+  /// Cancels a handler by index.
   ///
-  /// [handler] has to be the exact same function that [listen] was used
-  /// with, otherwise this function will return false.
-  bool ignore(void Function(TracerEventData) handler) {
-    return _onLog.unsubscribe(handler);
+  /// This will cancel the subscription of the handler, effectively stopping it
+  /// from receiving any more events. If the index is out of bounds, nothing
+  /// will happen.
+  ///
+  /// Alternatively, you can use the [cancel] function to cancel a handler by
+  /// object. This is useful if you want to cancel a specific handler.
+  void cancelAt(int index) {
+    if (index < 0 || index >= _handlers.length) return;
+    _handlers[index].subscription?.cancel();
+    _handlers.removeAt(index);
+  }
+
+  void _add(TracerHandler handler, {String argument = "handler"}) {
+    if (_handlers.contains(handler)) return;
+    if (handler.subscription != null) {
+      throw ArgumentError("Handler already has a subscription.", argument);
+    }
+    handler.subscription = _stream.stream.listen(handler.handle);
+    _handlers.add(handler);
+  }
+
+  /// Add a new handler to the [Tracer] object.
+  ///
+  /// Also see [TracerHandler] to learn more.
+  void add(TracerHandler handler) => _add(handler);
+
+  /// Cancels all handlers.
+  ///
+  /// This will cancel the subscription of all handlers, effectively stopping
+  /// them from receiving any more events.
+  ///
+  /// If you want to cancel a specific handler, use the [cancel] function.
+  /// If you want to cancel a handler by index, use the [cancelAt] function.
+  void dispose() {
+    for (var handler in _handlers) {
+      handler.subscription?.cancel();
+    }
+    _stream.close();
   }
 
   /// Create a raw log event.
@@ -291,7 +366,11 @@ class Tracer {
       Object? errorObj,
       StackTrace? stack,
       bool? exitOnFatal}) {
-    var event = TracerEventData(section, level, DateTime.now(), body.trim(),
+    var event = TracerEventData._(
+        section: section,
+        level: level,
+        timestamp: DateTime.now(),
+        body: body.trim(),
         description: (description == null) ? null : description.trim(),
         error: errorObj,
         stack: (stack == null) ? null : Trace.from(stack),
@@ -300,7 +379,7 @@ class Tracer {
     for (var filter in _filters) {
       if (!filter.handle(event)) return;
     }
-    _onLog.broadcast(event);
+    _stream.add(event);
   }
 
   /// Creates a new log event with the [TracerLevel.debug].
