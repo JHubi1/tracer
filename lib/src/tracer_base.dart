@@ -161,6 +161,9 @@ abstract class TracerHandler {
   /// The function handling the event.
   void handle(TracerEventData data);
 
+  /// Called when the handler is no longer needed.
+  void dispose() {}
+
   StreamSubscription? subscription;
 
   @override
@@ -204,6 +207,9 @@ abstract class TracerFilter {
   /// The function handling the event.
   bool handle(TracerEventData data);
 
+  /// Called when the handler is no longer needed.
+  void dispose() {}
+
   @override
   bool operator ==(Object other) {
     return other is TracerFilter && other.handle == handle;
@@ -242,10 +248,6 @@ abstract class TracerFilter {
 /// You can select which errors are shown using the [logLevel] argument. The
 /// set value is the smallest one allowed. Only events using it and any above
 /// will get handled.
-///
-/// Warning: Logs may be slightly delayed. It may take one millisecond delay
-/// to detect a log event from a synchronous function. This may be relevant
-/// for testing purposes.
 class Tracer {
   /// Unique identifier for this [Tracer] instance.
   final String section;
@@ -274,7 +276,7 @@ class Tracer {
   final List<TracerFilter> _filters;
   List<TracerFilter> get filters => _filters;
 
-  final _stream = StreamController<TracerEventData>.broadcast();
+  final _stream = StreamController<TracerEventData>.broadcast(sync: true);
 
   Tracer(String section,
       {this.logLevel = TracerLevel.info,
@@ -308,6 +310,7 @@ class Tracer {
   void cancel(TracerHandler handler) {
     for (var i = 0; i < _handlers.length; i++) {
       if (_handlers[i] == handler) {
+        _handlers[i].dispose();
         _handlers[i].subscription?.cancel();
         _handlers.removeAt(i);
         return;
@@ -325,6 +328,7 @@ class Tracer {
   /// object. This is useful if you want to cancel a specific handler.
   void cancelAt(int index) {
     if (index < 0 || index >= _handlers.length) return;
+    _handlers[index].dispose();
     _handlers[index].subscription?.cancel();
     _handlers.removeAt(index);
   }
@@ -352,8 +356,10 @@ class Tracer {
   /// If you want to cancel a handler by index, use the [cancelAt] function.
   void dispose() {
     for (var handler in _handlers) {
+      handler.dispose();
       handler.subscription?.cancel();
     }
+    _handlers.clear();
     _stream.close();
   }
 

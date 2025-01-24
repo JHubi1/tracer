@@ -6,8 +6,7 @@ import 'package:tracer/tracer.dart';
 void main() {
   var t = Tracer("example", logLevel: TracerLevel.debug, handlers: [
     TracerConsoleHandler(),
-    TracerFileHandler(Directory(
-        "${Directory.fromUri(Platform.script).parent.parent.path}${Platform.pathSeparator}logs"))
+    TracerFileHandler(File("logs/test.log")),
   ]);
   t.debug("This is a debug message");
   t.info("This is an info message");

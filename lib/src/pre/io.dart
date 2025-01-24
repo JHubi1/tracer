@@ -56,9 +56,8 @@ class TracerSimpleConsoleHandler extends TracerHandler {
 /// directory) share the same log file. Otherwise a suffix with the section
 /// name is added to the file name.
 ///
-/// All of the above can be overwritten using [customName]. If it it set, the
-/// filename is not variable and just that value.
-class TracerFileHandler extends TracerHandler {
+/// If you want to target a specific file, use [TracerFileHandler].
+class TracerDirectoryHandler extends TracerHandler {
   /// The directory to create the log files in.
   final Directory dir;
 
@@ -74,10 +73,6 @@ class TracerFileHandler extends TracerHandler {
   /// is used.
   final bool useDate;
 
-  /// A custom name used for the log file. This has to include a file ending,
-  /// `.log` is recommended.
-  final String? customName;
-
   bool _handledOverwrite = false;
 
   String _getFileName(TracerEventData data) {
@@ -86,15 +81,11 @@ class TracerFileHandler extends TracerHandler {
       name = "${DateFormat("yyyy-MM-dd").format(data.timestamp)}.log";
     }
     if (!shareFile) name = "${data.section}.$name";
-    if (customName != null) name = customName!;
     return name;
   }
 
-  TracerFileHandler(this.dir,
-      {this.append = true,
-      this.shareFile = true,
-      this.useDate = true,
-      this.customName}) {
+  TracerDirectoryHandler(this.dir,
+      {this.append = true, this.shareFile = true, this.useDate = true}) {
     assert(!shareFile || append);
     if (!dir.existsSync()) {
       dir.createSync(recursive: true);
@@ -111,5 +102,83 @@ class TracerFileHandler extends TracerHandler {
     _handledOverwrite = true;
 
     file.writeAsStringSync("${data.generatedMessage}\n", mode: FileMode.append);
+  }
+}
+
+/// An exception thrown by [TracerFileHandler].
+///
+/// This is thrown when the file handling fails. For example, when the file is
+/// locked by another process or the file is not accessible.
+class TracerFileHandlerException implements Exception {
+  final dynamic message;
+
+  TracerFileHandlerException([this.message]);
+
+  @override
+  String toString() {
+    Object? message = this.message;
+    if (message == null) return "TracerFileHandlerException";
+    return "TracerFileHandlerException: $message";
+  }
+}
+
+/// A handler outputting the log events to a single file.
+///
+/// It uses [TracerEventData.generatedMessage].
+///
+/// Pass the file you want to write to to the constructor. This will lock the
+/// file for the OS and future logs will be appended to it.
+///
+/// If [append] is disabled, the existing content of the log file will be wiped
+/// during the constructor call.
+///
+/// If [shareFile] is disabled, the file will be locked as long as the handler
+/// is active. No other process (section, or even other handler) can write to
+/// the file. Disabled by default.
+///
+/// [TracerFileHandlerException] is thrown when the file handling fails.
+///
+/// If you want to target a directory, use [TracerDirectoryHandler].
+class TracerFileHandler extends TracerHandler {
+  /// The file to write the logs to.
+  final File file;
+
+  /// Whether to enable appending to the existing file. If disabled, the
+  /// existing content of the log file will be wiped once the first log from
+  /// this [Tracer] instance is created.
+  final bool append;
+
+  /// Whether not to add a suffix to the log file name.
+  final bool shareFile;
+
+  RandomAccessFile? _raf;
+
+  TracerFileHandler(this.file, {this.append = true, this.shareFile = false}) {
+    if (!file.existsSync()) file.createSync(recursive: true);
+    try {
+      _raf = file.openSync(mode: FileMode.write);
+    } catch (_) {
+      throw TracerFileHandlerException("Failed to open the file");
+    }
+    try {
+      if (!append) _raf!.writeStringSync("");
+      if (!shareFile) _raf!.lockSync();
+    } catch (_) {
+      throw TracerFileHandlerException("Failed to lock the file");
+    }
+  }
+
+  @override
+  void handle(TracerEventData data) {
+    if (_raf == null) return;
+    _raf!.writeStringSync("${data.generatedMessage}\n");
+  }
+
+  @override
+  void dispose() {
+    try {
+      _raf?.unlockSync();
+      _raf?.closeSync();
+    } catch (_) {}
   }
 }

@@ -1,3 +1,9 @@
+# 0.4.0
+
+- Stream is sync again, so no more delay
+- `TracerFileHandler` is now called `TracerDirectoryHandler`, for a custom name use `TracerFileHandler`
+- `TracerFileHandler` is a new handler that writes to a file specifically
+
 # 0.3.0
 
 - No dependency on `event` anymore, not usable in browser
