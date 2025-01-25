@@ -76,9 +76,10 @@ class TracerEventData {
   /// The stack object that was attached to the log event.
   final Trace? stack;
 
-  /// Whether to use indentation in the output. This is only used in the
-  /// [TracerEventData]s generated message. It can be useful if the console is
-  /// quite narrow, so every bit of space is important.
+  /// Whether to use indentation in the output.
+  ///
+  /// This is only used in the [TracerEventData]s generated message. It can be
+  /// useful if the console is quite narrow, so every bit of space is important.
   bool indentation;
 
   TracerEventData._(
@@ -91,9 +92,12 @@ class TracerEventData {
       required this.stack,
       required this.indentation});
 
-  /// Creates a rich output including a [timestamp], the severity [level], and
-  /// the [body]. If given, it also embeds the [description], [error] and
-  /// [stack]. Stacks are formatted into a human readable format.
+  /// Creates a rich output.
+  ///
+  /// This included a [timestamp], the severity [level], and the [body].
+  /// If given, it also embeds the [description], [error] and [stack].
+  ///
+  /// Stacks are formatted into a human readable format.
   String get generatedMessageColored {
     var time = DateFormat("yyyy-MM-dd HH:mm:ss").format(timestamp);
 
@@ -122,8 +126,11 @@ class TracerEventData {
     return text;
   }
 
-  /// Creates an output including a [timestamp], the severity [level], and the
-  /// [body]. If given, it also embeds the [description], [error] and [stack].
+  /// Creates a plain-text output.
+  ///
+  /// This included a [timestamp], the severity [level], and the [body].
+  /// If given, it also embeds the [description], [error] and [stack].
+  ///
   /// Stacks are formatted into a human readable format.
   String get generatedMessage =>
       generatedMessageColored.replaceAll(RegExp(r'\x1B\[[0-9]+m'), "");
@@ -261,18 +268,32 @@ class Tracer {
   /// useful if the console is quite narrow, so every bit of space is important.
   bool indentation;
 
+  /// Whether to use UTC time for the timestamps.
+  ///
+  /// If this is set to true, the timestamps will be in UTC time. Otherwise, the
+  /// local time will be used.
+  ///
+  /// This is useful if you want to have a consistent time format across all
+  /// logs, regardless of the timezone of the system.
+  ///
+  /// To make behavior consistent, this may not be changed after the object is
+  /// created.
+  final bool forceUtc;
+
   /// A list of all [TracerEventData]s generated in this session.
-  List<TracerEventData> get logs => _logs;
   final List<TracerEventData> _logs = [];
+  List<TracerEventData> get logs => _logs;
 
   /// The composed version os [logs], a string of all [TracerEventData]s
   /// generated in this session.
-  String get logsGenerated => _logsGenerated;
   String _logsGenerated = "";
+  String get logsGenerated => _logsGenerated;
 
+  /// A list of all handlers added to this [Tracer] object.
   final List<TracerHandler> _handlers;
   List<TracerHandler> get handlers => _handlers;
 
+  /// A list of all filters added to this [Tracer] object.
   final List<TracerFilter> _filters;
   List<TracerFilter> get filters => _filters;
 
@@ -280,9 +301,10 @@ class Tracer {
 
   Tracer(String section,
       {this.logLevel = TracerLevel.info,
+      this.indentation = true,
+      this.forceUtc = false,
       List<TracerHandler> handlers = const [],
-      List<TracerFilter> filters = const [],
-      this.indentation = true})
+      List<TracerFilter> filters = const []})
       : section = section.trim(),
         _handlers = [],
         _filters = filters {
@@ -372,10 +394,11 @@ class Tracer {
       Object? errorObj,
       StackTrace? stack,
       bool? exitOnFatal}) {
-    var event = TracerEventData._(
+    final timestamp = DateTime.now();
+    final event = TracerEventData._(
         section: section,
         level: level,
-        timestamp: DateTime.now(),
+        timestamp: forceUtc ? timestamp.toUtc() : timestamp,
         body: body.trim(),
         description: (description == null) ? null : description.trim(),
         error: errorObj,

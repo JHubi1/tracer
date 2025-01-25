@@ -1,3 +1,8 @@
+# 0.4.1
+
+- Reworked `TracerFileHandler`, `shareFile` is now called `share`, and is true by default
+- Added `forceUtc` option to `Tracer` object. If true, all dates will be in UTC
+
 # 0.4.0
 
 - Stream is sync again, so no more delay

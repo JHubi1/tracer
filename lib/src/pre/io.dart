@@ -61,9 +61,10 @@ class TracerDirectoryHandler extends TracerHandler {
   /// The directory to create the log files in.
   final Directory dir;
 
-  /// Whether to enable appending to the existing file. If disabled, the
-  /// existing content of the log file will be wiped once the first log from
-  /// this [Tracer] instance is created.
+  /// Whether to enable appending to the existing file.
+  ///
+  /// If disabled, the existing content of the log file will be wiped once the
+  /// first log from this [Tracer] instance is created.
   final bool append;
 
   /// Whether not to add a suffix to the log file name.
@@ -132,9 +133,9 @@ class TracerFileHandlerException implements Exception {
 /// If [append] is disabled, the existing content of the log file will be wiped
 /// during the constructor call.
 ///
-/// If [shareFile] is disabled, the file will be locked as long as the handler
+/// If [share] is disabled, the file will be locked as long as the handler
 /// is active. No other process (section, or even other handler) can write to
-/// the file. Disabled by default.
+/// the file.
 ///
 /// [TracerFileHandlerException] is thrown when the file handling fails.
 ///
@@ -143,35 +144,44 @@ class TracerFileHandler extends TracerHandler {
   /// The file to write the logs to.
   final File file;
 
-  /// Whether to enable appending to the existing file. If disabled, the
-  /// existing content of the log file will be wiped once the first log from
-  /// this [Tracer] instance is created.
+  /// Whether to enable appending to the existing file.
+  ///
+  /// If disabled, the existing content of the log file will be wiped once the
+  /// object has been initialized.
   final bool append;
 
-  /// Whether not to add a suffix to the log file name.
-  final bool shareFile;
+  /// Whether to lock the file for the OS.
+  ///
+  /// **CAUTION**: This may lead to buggy behavior, because both, read and write
+  /// access to other processes, are being blocked. Only disable this if
+  /// absolutely necessary!
+  final bool share;
 
   RandomAccessFile? _raf;
 
-  TracerFileHandler(this.file, {this.append = true, this.shareFile = false}) {
-    if (!file.existsSync()) file.createSync(recursive: true);
+  TracerFileHandler(this.file, {this.append = true, this.share = true}) {
+    file.createSync(recursive: true);
     try {
-      _raf = file.openSync(mode: FileMode.write);
+      _raf = file.openSync(mode: FileMode.writeOnlyAppend);
     } catch (_) {
-      throw TracerFileHandlerException("Failed to open the file");
+      throw TracerFileHandlerException("Failed to open file");
     }
     try {
-      if (!append) _raf!.writeStringSync("");
-      if (!shareFile) _raf!.lockSync();
+      if (!append) _raf!.truncateSync(0);
+      if (!share) _raf!.lockSync(FileLock.exclusive);
     } catch (_) {
-      throw TracerFileHandlerException("Failed to lock the file");
+      throw TracerFileHandlerException("Failed to lock file");
     }
   }
 
   @override
   void handle(TracerEventData data) {
     if (_raf == null) return;
-    _raf!.writeStringSync("${data.generatedMessage}\n");
+    try {
+      _raf!.writeStringSync("${data.generatedMessage}\n");
+    } catch (_) {
+      throw TracerFileHandlerException("Failed to write to file");
+    }
   }
 
   @override
@@ -179,6 +189,7 @@ class TracerFileHandler extends TracerHandler {
     try {
       _raf?.unlockSync();
       _raf?.closeSync();
+      _raf = null;
     } catch (_) {}
   }
 }

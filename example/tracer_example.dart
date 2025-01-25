@@ -1,12 +1,13 @@
-import 'dart:async';
 import 'dart:io';
+import 'dart:async';
 
 import 'package:tracer/tracer.dart';
 
 void main() {
-  var t = Tracer("example", logLevel: TracerLevel.debug, handlers: [
+  var t =
+      Tracer("example", logLevel: TracerLevel.debug, forceUtc: true, handlers: [
     TracerConsoleHandler(),
-    TracerFileHandler(File("logs/test.log")),
+    TracerFileHandler(File("logs/test.log"), append: false),
   ]);
   t.debug("This is a debug message");
   t.info("This is an info message");
@@ -40,5 +41,12 @@ void main() {
         "This is an error with an exception and stack trace, triggered by a zone",
         error: error,
         stack: stack);
+  });
+
+  print("-----");
+
+  t.info("The next message will be shown in 5 seconds");
+  Future.delayed(Duration(seconds: 5), () {
+    t.info("This message was delayed by 5 seconds");
   });
 }
