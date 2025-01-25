@@ -11,7 +11,7 @@
 
 # 0.3.0
 
-- No dependency on `event` anymore, not usable in browser
+- No dependency on `event` anymore, now usable in browser
 - Removed `listen` and `ignore` functions, use `add` and `cancel` instead
 - Various improvements
 
