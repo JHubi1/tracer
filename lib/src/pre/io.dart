@@ -160,6 +160,7 @@ class TracerFileHandler extends TracerHandler {
   RandomAccessFile? _raf;
 
   TracerFileHandler(this.file, {this.append = true, this.share = true}) {
+    if (!append && file.existsSync()) file.deleteSync(recursive: true);
     file.createSync(recursive: true);
     try {
       _raf = file.openSync(mode: FileMode.writeOnlyAppend);
@@ -167,7 +168,6 @@ class TracerFileHandler extends TracerHandler {
       throw TracerFileHandlerException("Failed to open file");
     }
     try {
-      if (!append) _raf!.truncateSync(0);
       if (!share) _raf!.lockSync(FileLock.exclusive);
     } catch (_) {
       throw TracerFileHandlerException("Failed to lock file");

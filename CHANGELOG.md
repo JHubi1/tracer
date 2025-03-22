@@ -1,3 +1,7 @@
+# Unreleased
+
+- Fixed error character being added to the beginning of `TracerFileHandler`'s log file when using `append`
+
 # 0.4.1
 
 - Reworked `TracerFileHandler`, `shareFile` is now called `share`, and is true by default
