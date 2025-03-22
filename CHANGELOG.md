@@ -1,4 +1,4 @@
-# Unreleased
+# 0.4.2
 
 - Fixed error character being added to the beginning of `TracerFileHandler`'s log file when using `append`
 

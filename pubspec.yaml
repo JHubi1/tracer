@@ -1,6 +1,6 @@
 name: tracer
 description: A modern, simple and easy-to-implement logging framework for Dart.
-version: 0.4.1
+version: 0.4.2
 repository: https://github.com/JHubi1/tracer
 
 topics:
